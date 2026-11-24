@@ -61,18 +61,30 @@ The shared course prefix (syllabus, AI policy, course info, weekly outline) is a
 
 The model alone wrote a methods section and literature review paragraphs when asked, and invented a statistic. That is why requests to produce graded work are now stopped before they reach the model.
 
-**Load: 50 students asking at once, 100 questions**
+**Prefix caching on vs off** (Kaggle, one Tesla T4, 10 students asking at once, 30 questions, up to 200 output tokens)
 
-| | Prefix cache on | Prefix cache off |
+| | Prefix cache on | Prefix cache off | Change |
+|---|---|---|---|
+| Time to first token, p50 / p95 | 1.1 s / 10.3 s | 24.9 s / 128.4 s | 22x faster (p50) |
+| Full answer latency, p50 / p95 | 15.4 s / 31.5 s | 164.9 s / 272.2 s | 11x faster (p50) |
+| Questions per minute | 34.3 | 3.9 | 8.8x |
+| Output tokens per second | 74.7 | 9.5 | 7.9x |
+| GPU time per 1,000 questions | ~29 GPU-minutes | ~254 GPU-minutes | 8.7x less |
+
+Without caching, every question re-processes the ~9K-token course prefix, so prefill dominates. With caching, the prefix is computed once and every later question only pays for its own retrieved notes and question.
+
+**A full class at once** (50 students, 100 questions, cache on)
+
+| | 200-token answers (Colab T4) | 120-token answers (Kaggle T4) |
 |---|---|---|
-| Time to first token, p50 / p95 | 2.4 s / 26.4 s | did not finish |
-| Full answer latency, p50 / p95 | 48.5 s / 96.7 s | did not finish |
-| Questions per minute | 48.2 | under ~9 (100 questions not done after ~11 min) |
-| GPU time per 1,000 questions | ~21 GPU-minutes | |
+| Time to first token, p50 / p95 | 2.4 s / 26.4 s | 3.1 s / 11.6 s |
+| Full answer latency, p50 / p95 | 48.5 s / 96.7 s | 31.8 s / 52.6 s |
+| Questions per minute | 48.2 | 76.3 |
+| GPU time per 1,000 questions | ~21 GPU-minutes | ~13 GPU-minutes |
 
-With caching on, the full run took about 2 minutes. With caching off, every request re-processes the ~9K-token course prefix, and the run had not finished after about 11 minutes, so it was stopped. The cache-off throughput bound comes from that, not from a completed run.
+Capping answer length is the cheapest latency win. These two runs were on different T4 machines (Colab and Kaggle), so treat the comparison as approximate. An earlier Colab cache-off run at 50 students did not finish 100 questions in ~11 minutes and was stopped.
 
-Honest caveat: 48 s median for a full answer at 50 simultaneous users is too slow for a good chat experience on a T4. Next steps: cap answer length, add a request queue with expected wait, and test on a larger GPU.
+Honest caveat: a 32 s median full answer at 50 simultaneous users is still slow for chat on one T4. Next: a request queue that shows expected wait, streaming the first sentence fast, and a larger GPU or a quantized model. Raw numbers: `results/loadtest_t4.jsonl`.
 
 ## Roadmap
 
