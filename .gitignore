@@ -1,0 +1,6 @@
+# Course materials belong to the instructor. Never commit them.
+course/
+index/
+*.jsonl
+__pycache__/
+.env
